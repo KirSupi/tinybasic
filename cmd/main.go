@@ -31,9 +31,6 @@ func main() {
 			if strings.ToLower(line) == "end" {
 				break
 			}
-			if strings.ToLower(line) == "\n" {
-				break
-			}
 			// Load the line into source and run it
 			err := s.LoadLine(line)
 			if err != nil {
