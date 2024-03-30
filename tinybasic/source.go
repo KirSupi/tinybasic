@@ -3,7 +3,6 @@ package tinybasic
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"strconv"
@@ -30,7 +29,7 @@ func (s *Source) Save(filename string) error {
 	for _, line := range s.Lines {
 		builder.WriteString(fmt.Sprintf("%d %s\n", line.Label, line.Text))
 	}
-	return ioutil.WriteFile(filename, []byte(builder.String()), 0644)
+	return os.WriteFile(filename, []byte(builder.String()), 0644)
 }
 func (s *Source) Load(filename string) error {
 	file, err := os.Open(filename)
@@ -61,6 +60,20 @@ func (s *Source) Load(filename string) error {
 		s.Insert(Line{Label: label, Text: parts[1]})
 	}
 	return scanner.Err()
+}
+func (s *Source) LoadLine(line string) error {
+	parts := strings.SplitN(line, " ", 2)
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid line format: %s", line)
+	}
+
+	label, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return fmt.Errorf("invalid label format: %s", parts[0])
+	}
+
+	s.Insert(Line{Label: label, Text: parts[1]})
+	return nil
 }
 func (s *Source) Insert(newLine Line) {
 	index := sort.Search(len(s.Lines), func(i int) bool {
