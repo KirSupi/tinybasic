@@ -1,6 +1,8 @@
 package program
 
 import (
+	"math/rand/v2"
+
 	"tinybasic/tinybasic"
 )
 
@@ -94,7 +96,7 @@ func (p *Program) calculateExpressionTreeItem(treeItem expressionTreeItem) (res 
 		return resLeft >> resRight, nil
 	case ExpressionItemTypeEquals:
 		return fromBool(resLeft == resRight), nil
-	case ExpressionItemTypeNotEquals:
+	case ExpressionItemTypeNotEquals, ExpressionItemTypeNotEquals2:
 		return fromBool(resLeft != resRight), nil
 	case ExpressionItemTypeLess:
 		return fromBool(resLeft < resRight), nil
@@ -109,11 +111,73 @@ func (p *Program) calculateExpressionTreeItem(treeItem expressionTreeItem) (res 
 	}
 }
 
-func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expressionItem) {
+func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expressionItem, err error) {
 	parser := tinybasic.NewLineParserWithScanner(scanner)
 
 	for !scanner.IsEOL() {
+		if len(items) >= 1 && items[len(items)-1].itemType == ExpressionItemTypeThen {
+			break
+		}
+
 		scanner.GetSpaces()
+
+		rndFunction := scanner.GetString(ExpressionItemTypeRnd)
+		if rndFunction != nil {
+			scanner.GetSpaces()
+
+			bracket := scanner.GetString(ExpressionItemTypeBracketOpen)
+			if bracket == nil {
+				return nil, ErrInvalidParams
+			}
+
+			scanner.Shift(-1) // отступаем обратно, чтоб спарсить вместе с открывающей скобкой
+
+			nextItems, err := p.parseExpression(scanner)
+			if err != nil {
+				return append(items, nextItems...), err
+			}
+
+			index, err := getClosingBracketIndex(nextItems)
+			if err != nil {
+				return append(items, nextItems...), err
+			}
+
+			if len(nextItems) <= index || index < 1 {
+				return append(items, nextItems...), ErrInvalidParams
+			}
+
+			randomMaxValue, err := p.calculateExpression(nextItems[1:index])
+			if err != nil {
+				return append(items, nextItems...), err
+			}
+
+			if randomMaxValue <= 0 {
+				return append(items, nextItems...), ErrInvalidParams
+			}
+
+			randomValue := rand.N(randomMaxValue)
+
+			items = append(items, expressionItem{
+				itemType: ExpressionItemTypeValue,
+				value:    &randomValue,
+			})
+
+			if len(nextItems) > index+1 {
+				items = append(items, nextItems[index+1:]...)
+			}
+
+			continue
+		}
+
+		thenOperator := scanner.GetString(ExpressionItemTypeThen)
+		if thenOperator != nil {
+			items = append(items, expressionItem{
+				itemType: ExpressionItemTypeThen,
+				value:    nil,
+			})
+
+			break
+		}
 
 		variableName := parser.GetVariable()
 		if variableName != nil {
@@ -148,23 +212,27 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expre
 			ExpressionItemTypeMod,
 			ExpressionItemTypeBitShiftLeft,
 			ExpressionItemTypeBitShiftRight,
-			ExpressionItemTypeEquals,
-			ExpressionItemTypeNotEquals,
-			ExpressionItemTypeLess,
-			ExpressionItemTypeGreater,
 			ExpressionItemTypeGreaterOrEquals,
 			ExpressionItemTypeLessOrEquals,
+			ExpressionItemTypeNotEquals,
+			ExpressionItemTypeNotEquals2,
+			ExpressionItemTypeEquals,
+			ExpressionItemTypeLess,
+			ExpressionItemTypeGreater,
 		})
 		if item != nil {
 			items = append(items, expressionItem{
 				itemType: expressionItemType(*item),
 				value:    nil,
 			})
+
 			continue
 		}
+
+		break
 	}
 
-	return items
+	return items, nil
 }
 
 type expressionItemType string
@@ -186,10 +254,13 @@ const (
 	ExpressionItemTypeBitShiftRight    = ">>"
 	ExpressionItemTypeEquals           = "="
 	ExpressionItemTypeNotEquals        = "<>"
+	ExpressionItemTypeNotEquals2       = "><"
 	ExpressionItemTypeLess             = "<"
 	ExpressionItemTypeGreater          = ">"
 	ExpressionItemTypeGreaterOrEquals  = ">="
 	ExpressionItemTypeLessOrEquals     = "<="
+	ExpressionItemTypeThen             = "THEN"
+	ExpressionItemTypeRnd              = "RND"
 )
 
 type expressionItem struct {
@@ -237,6 +308,7 @@ func getClosingBracketIndex(items []expressionItem) (index int, err error) {
 var operationsPriority = map[expressionItemType]int{
 	ExpressionItemTypeEquals:          1,
 	ExpressionItemTypeNotEquals:       1,
+	ExpressionItemTypeNotEquals2:      1,
 	ExpressionItemTypeLess:            1,
 	ExpressionItemTypeGreater:         1,
 	ExpressionItemTypeGreaterOrEquals: 1,
@@ -261,7 +333,8 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 	ops := []*expressionItem(nil)
 	nodes := []*expressionTreeItem(nil)
 
-	for i, item := range items {
+	for i := 0; i < len(items); i++ {
+		item := items[i]
 		if item.itemType == ExpressionItemTypeValue {
 			nodes = append(nodes, &expressionTreeItem{
 				item:  &items[i],
@@ -315,6 +388,20 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 			}
 
 			ops = append(ops, &items[i])
+		} else if item.itemType == ExpressionItemTypeBracketOpen {
+			index, err := getClosingBracketIndex(items[i:])
+			if err != nil {
+				return nil, err
+			}
+
+			node, err := p.generateTree(items[i+1 : i+index])
+			if err != nil {
+				return nil, err
+			}
+
+			i = i + index
+
+			nodes = append(nodes, node)
 		}
 	}
 

@@ -10,7 +10,8 @@ import (
 func main() {
 	s := tinybasic.NewSource()
 
-	err := s.Load("./test.txt")
+	//err := s.Load("./test.bas")
+	err := s.Load("./euphoria.bas")
 	if err != nil {
 		log.Fatalln(err)
 	}

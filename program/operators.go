@@ -192,7 +192,11 @@ func (p *Program) print(s *tinybasic.LineScanner) error {
 			continue
 		}
 
-		expression := p.parseExpression(s)
+		expression, err := p.parseExpression(s)
+		if err != nil {
+			return err
+		}
+
 		if len(expression) == 0 {
 			return ErrInvalidParams
 		}
@@ -228,7 +232,11 @@ func (p *Program) let(s *tinybasic.LineScanner) error {
 	}
 
 	// " = B + 10"
-	expression := p.parseExpression(s)
+	expression, err := p.parseExpression(s)
+	if err != nil {
+		return err
+	}
+
 	if len(expression) <= 1 {
 		return ErrInvalidParams
 	}
@@ -244,6 +252,87 @@ func (p *Program) let(s *tinybasic.LineScanner) error {
 	}
 
 	p.vars.Set(*variableName, result)
+
+	return nil
+}
+func (p *Program) gosub(s *tinybasic.LineScanner) error {
+	spaces := s.GetSpaces()
+	if spaces == nil {
+		return ErrInvalidParams
+	}
+
+	param := s.GetNumber()
+	if param == nil {
+		return ErrInvalidParams
+	}
+
+	for i, line := range p.s.Lines {
+		if line.Label == *param {
+			// Добавляем индекс текущей строки в стек вызовов, чтоб вернуться сюда после RETURN
+			p.gosubCallingLinesIndexes = append(p.gosubCallingLinesIndexes, p.currentIndex)
+
+			// Ставим i-1, т.к. потом мы увеличиваем currentIndex на 1 в цикле в функции Run
+			p.currentIndex = i - 1
+			return nil
+		}
+	}
+
+	return errors.New("line not found")
+}
+func (p *Program) returnOperator(_ *tinybasic.LineScanner) error {
+	if len(p.gosubCallingLinesIndexes) == 0 {
+		return ErrInvalidParams
+	}
+
+	// берём индекс строки, из которой была вызвана текущая подпрограмма
+	index := p.gosubCallingLinesIndexes[len(p.gosubCallingLinesIndexes)-1]
+
+	// удаляем индекс из стека
+	p.gosubCallingLinesIndexes = p.gosubCallingLinesIndexes[:len(p.gosubCallingLinesIndexes)-1]
+
+	p.currentIndex = index
+	// после завершения работы этого обработчика p.currentIndex увеличится на 1,
+	// и мы окажемся на следующей строке после той, из которой вызывали
+
+	return nil
+}
+func (p *Program) ifOperator(s *tinybasic.LineScanner) error {
+	spaces := s.GetSpaces()
+	if spaces == nil {
+		return ErrInvalidParams
+	}
+
+	expression, err := p.parseExpression(s)
+	if err != nil {
+		return err
+	}
+	if len(expression) <= 1 {
+		return ErrInvalidParams
+	}
+
+	if expression[len(expression)-1].itemType != ExpressionItemTypeThen {
+		return ErrInvalidParams
+	}
+
+	result, err := p.calculateExpression(expression[:len(expression)-1])
+	if err != nil {
+		return ErrInvalidParams
+	}
+
+	if result != 0 {
+		s.GetSpaces()
+		operator := s.GetStrings(program.supportedOperators)
+		if operator == nil {
+			return ErrInvalidParams
+		}
+
+		err = Operators[Operator(*operator)](s)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
 
 	return nil
 }
