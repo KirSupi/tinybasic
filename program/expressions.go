@@ -79,6 +79,9 @@ func (p *Program) calculateSyntaxTreeItem(treeItem syntaxTreeNode) (res int, err
 	case TokenTypeOperatorMinus:
 		return resLeft - resRight, nil
 	case TokenTypeOperatorDivision:
+		if resRight == 0 {
+			return 0, ErrInvalidParams
+		}
 		return resLeft / resRight, nil
 	case TokenTypeMod:
 		return resLeft % resRight, nil
