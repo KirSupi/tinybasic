@@ -3,7 +3,6 @@ package program
 import (
 	"errors"
 	"fmt"
-	"slices"
 
 	"tinybasic/tinybasic"
 )
@@ -45,26 +44,31 @@ func Run(s *tinybasic.Source) (err error) {
 
 	line := tinybasic.Line{}
 
+	// Проходим по всем строкам программы
 	for program.currentIndex < len(program.s.Lines) {
 		line = program.s.Lines[program.currentIndex]
 
 		scanner := tinybasic.NewLineScanner(line.Text)
 
+		// Пропускаем пробелы, если они есть
+		scanner.GetSpaces()
+
+		// Считываем оператор, который надо выполнить
 		operator := scanner.GetStrings(program.supportedOperators)
 		if operator == nil {
 			return fmt.Errorf("unsupported operator on line %d %s", line.Label, line.Text)
 		}
 
-		if slices.Contains([]int{
-			2390,
-		}, line.Label) {
-			fmt.Printf("running %d %s\n", line.Label, line.Text)
-		}
-		err = Operators[Operator(*operator)](scanner)
+		// Находим обработчик для оператора
+		handler := Operators[Operator(*operator)]
+
+		// Запускаем обработчик для оператора
+		err = handler(scanner)
 		if err != nil {
 			return err
 		}
 
+		// Переходим на следующую строку
 		program.currentIndex++
 	}
 
