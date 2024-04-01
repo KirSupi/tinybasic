@@ -37,14 +37,13 @@ func Run(s *tinybasic.Source) (err error) {
 	}
 	program.s = s
 	program.vars = tinybasic.NewVariables()
+	program.currentIndex = 0
 
 	for cmd := range Operators {
 		program.supportedOperators = append(program.supportedOperators, string(cmd))
 	}
 
 	line := tinybasic.Line{}
-
-	program.currentIndex = 0
 
 	for program.currentIndex < len(program.s.Lines) {
 		line = program.s.Lines[program.currentIndex]

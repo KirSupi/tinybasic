@@ -332,7 +332,7 @@ var operationsPriority = map[expressionItemType]int{
 func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, error) {
 	ops := []*expressionItem(nil)
 	nodes := []*expressionTreeItem(nil)
-
+	// A + 10 * 11 + 1
 	for i := 0; i < len(items); i++ {
 		item := items[i]
 		if item.itemType == ExpressionItemTypeValue {
@@ -404,6 +404,9 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 			nodes = append(nodes, node)
 		}
 	}
+
+	// ops: +(1), +(2)
+	// nodes: "A", "11*10", "1"
 
 	for len(ops) != 0 {
 		node := &expressionTreeItem{
