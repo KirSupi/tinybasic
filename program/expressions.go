@@ -16,14 +16,14 @@ func (p *Program) calculateExpression(expression []token) (res int, err error) {
 		return res, nil
 	}
 
-	res, err = p.calculateExpressionTreeItem(*node)
+	res, err = p.calculateSyntaxTreeItem(*node)
 	if err != nil {
 		return res, err
 	}
 
 	return res, nil
 }
-func (p *Program) calculateExpressionTreeItem(treeItem syntaxTreeNode) (res int, err error) {
+func (p *Program) calculateSyntaxTreeItem(treeItem syntaxTreeNode) (res int, err error) {
 	if treeItem.left == nil && treeItem.right == nil {
 		if treeItem.item.tokenType == TokenTypeValue {
 			return *treeItem.item.value, nil
@@ -34,10 +34,10 @@ func (p *Program) calculateExpressionTreeItem(treeItem syntaxTreeNode) (res int,
 
 	if treeItem.item == nil {
 		if treeItem.left != nil && treeItem.right == nil {
-			return p.calculateExpressionTreeItem(*treeItem.left)
+			return p.calculateSyntaxTreeItem(*treeItem.left)
 		}
 		if treeItem.left == nil && treeItem.right != nil {
-			return p.calculateExpressionTreeItem(*treeItem.right)
+			return p.calculateSyntaxTreeItem(*treeItem.right)
 		}
 
 		return res, ErrInvalidParams
@@ -45,7 +45,7 @@ func (p *Program) calculateExpressionTreeItem(treeItem syntaxTreeNode) (res int,
 
 	resLeft := 0
 	if treeItem.left != nil {
-		resLeft, err = p.calculateExpressionTreeItem(*treeItem.left)
+		resLeft, err = p.calculateSyntaxTreeItem(*treeItem.left)
 		if err != nil {
 			return res, err
 		}
@@ -53,7 +53,7 @@ func (p *Program) calculateExpressionTreeItem(treeItem syntaxTreeNode) (res int,
 
 	resRight := 0
 	if treeItem.right != nil {
-		resRight, err = p.calculateExpressionTreeItem(*treeItem.right)
+		resRight, err = p.calculateSyntaxTreeItem(*treeItem.right)
 		if err != nil {
 			return res, err
 		}
