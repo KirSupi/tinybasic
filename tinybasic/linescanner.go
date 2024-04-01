@@ -1,7 +1,6 @@
 package tinybasic
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -187,14 +186,4 @@ func (ls *LineScanner) GetStrings(strings []string) *string {
 		}
 	}
 	return nil
-}
-
-func TestLineScanner() {
-	// Пример использования
-	scanner := NewLineScanner("123 Hello World! 456")
-	fmt.Println(scanner.GetNumber())                             // "123"
-	fmt.Println(scanner.GetSpace())                              // " "
-	fmt.Println(scanner.GetString("Hello"))                      // "Hello"
-	fmt.Println(scanner.GetSpaces())                             // " "
-	fmt.Println(scanner.GetStrings([]string{"World!", "Hello"})) // "World!"
 }

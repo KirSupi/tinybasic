@@ -6,8 +6,8 @@ import (
 	"tinybasic/tinybasic"
 )
 
-func (p *Program) calculateExpression(expression []expressionItem) (res int, err error) {
-	node, err := p.generateTree(expression)
+func (p *Program) calculateExpression(expression []token) (res int, err error) {
+	node, err := p.generateSyntaxTree(expression)
 	if err != nil {
 		return res, err
 	}
@@ -23,9 +23,9 @@ func (p *Program) calculateExpression(expression []expressionItem) (res int, err
 
 	return res, nil
 }
-func (p *Program) calculateExpressionTreeItem(treeItem expressionTreeItem) (res int, err error) {
+func (p *Program) calculateExpressionTreeItem(treeItem syntaxTreeNode) (res int, err error) {
 	if treeItem.left == nil && treeItem.right == nil {
-		if treeItem.item.itemType == ExpressionItemTypeValue {
+		if treeItem.item.tokenType == TokenTypeValue {
 			return *treeItem.item.value, nil
 		}
 
@@ -61,71 +61,71 @@ func (p *Program) calculateExpressionTreeItem(treeItem expressionTreeItem) (res 
 
 	// Unary operations
 	if treeItem.left == nil {
-		switch treeItem.item.itemType {
-		case ExpressionItemTypeOperatorPlus:
+		switch treeItem.item.tokenType {
+		case TokenTypeOperatorPlus:
 			return resRight, nil
-		case ExpressionItemTypeOperatorMinus:
+		case TokenTypeOperatorMinus:
 			return -resRight, nil
-		case ExpressionItemTypeNot:
+		case TokenTypeNot:
 			return fromBool(!toBool(resRight)), nil
 		}
 	}
 
-	switch treeItem.item.itemType {
-	case ExpressionItemTypeValue:
+	switch treeItem.item.tokenType {
+	case TokenTypeValue:
 		return *treeItem.item.value, nil
-	case ExpressionItemTypeOperatorPlus:
+	case TokenTypeOperatorPlus:
 		return resLeft + resRight, nil
-	case ExpressionItemTypeOperatorMinus:
+	case TokenTypeOperatorMinus:
 		return resLeft - resRight, nil
-	case ExpressionItemTypeOperatorDivision:
+	case TokenTypeOperatorDivision:
 		return resLeft / resRight, nil
-	case ExpressionItemTypeMod:
+	case TokenTypeMod:
 		return resLeft % resRight, nil
-	case ExpressionItemTypeOperatorMultiply:
+	case TokenTypeOperatorMultiply:
 		return resLeft * resRight, nil
-	case ExpressionItemTypeOr:
+	case TokenTypeOr:
 		return fromBool(toBool(resLeft) || toBool(resRight)), nil
-	case ExpressionItemTypeAnd:
+	case TokenTypeAnd:
 		return fromBool(toBool(resLeft) && toBool(resRight)), nil
-	case ExpressionItemTypeXor:
+	case TokenTypeXor:
 		return fromBool(toBool(resLeft) != toBool(resRight)), nil
-	case ExpressionItemTypeBitShiftLeft:
+	case TokenTypeBitShiftLeft:
 		return resLeft << resRight, nil
-	case ExpressionItemTypeBitShiftRight:
+	case TokenTypeBitShiftRight:
 		return resLeft >> resRight, nil
-	case ExpressionItemTypeEquals:
+	case TokenTypeEquals:
 		return fromBool(resLeft == resRight), nil
-	case ExpressionItemTypeNotEquals, ExpressionItemTypeNotEquals2:
+	case TokenTypeNotEquals, TokenTypeNotEquals2:
 		return fromBool(resLeft != resRight), nil
-	case ExpressionItemTypeLess:
+	case TokenTypeLess:
 		return fromBool(resLeft < resRight), nil
-	case ExpressionItemTypeLessOrEquals:
+	case TokenTypeLessOrEquals:
 		return fromBool(resLeft <= resRight), nil
-	case ExpressionItemTypeGreater:
+	case TokenTypeGreater:
 		return fromBool(resLeft > resRight), nil
-	case ExpressionItemTypeGreaterOrEquals:
+	case TokenTypeGreaterOrEquals:
 		return fromBool(resLeft >= resRight), nil
 	default:
 		return res, ErrInvalidParams
 	}
 }
 
-func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expressionItem, err error) {
+func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []token, err error) {
 	parser := tinybasic.NewLineParserWithScanner(scanner)
 
 	for !scanner.IsEOL() {
-		if len(items) >= 1 && items[len(items)-1].itemType == ExpressionItemTypeThen {
+		if len(items) >= 1 && items[len(items)-1].tokenType == TokenTypeThen {
 			break
 		}
 
 		scanner.GetSpaces()
 
-		rndFunction := scanner.GetString(ExpressionItemTypeRnd)
+		rndFunction := scanner.GetString(TokenTypeRnd)
 		if rndFunction != nil {
 			scanner.GetSpaces()
 
-			bracket := scanner.GetString(ExpressionItemTypeBracketOpen)
+			bracket := scanner.GetString(TokenTypeBracketOpen)
 			if bracket == nil {
 				return nil, ErrInvalidParams
 			}
@@ -157,9 +157,9 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expre
 
 			randomValue := rand.N(randomMaxValue)
 
-			items = append(items, expressionItem{
-				itemType: ExpressionItemTypeValue,
-				value:    &randomValue,
+			items = append(items, token{
+				tokenType: TokenTypeValue,
+				value:     &randomValue,
 			})
 
 			if len(nextItems) > index+1 {
@@ -169,11 +169,11 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expre
 			continue
 		}
 
-		thenOperator := scanner.GetString(ExpressionItemTypeThen)
+		thenOperator := scanner.GetString(TokenTypeThen)
 		if thenOperator != nil {
-			items = append(items, expressionItem{
-				itemType: ExpressionItemTypeThen,
-				value:    nil,
+			items = append(items, token{
+				tokenType: TokenTypeThen,
+				value:     nil,
 			})
 
 			break
@@ -182,48 +182,48 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expre
 		variableName := parser.GetVariable()
 		if variableName != nil {
 			value := p.vars.Get(*variableName)
-			items = append(items, expressionItem{
-				itemType: ExpressionItemTypeValue,
-				value:    &value,
+			items = append(items, token{
+				tokenType: TokenTypeValue,
+				value:     &value,
 			})
 			continue
 		}
 
 		value := scanner.GetNumber()
 		if value != nil {
-			items = append(items, expressionItem{
-				itemType: ExpressionItemTypeValue,
-				value:    value,
+			items = append(items, token{
+				tokenType: TokenTypeValue,
+				value:     value,
 			})
 			continue
 		}
 
 		item := scanner.GetStrings([]string{
-			ExpressionItemTypeOperatorPlus,
-			ExpressionItemTypeOperatorMinus,
-			ExpressionItemTypeOperatorDivision,
-			ExpressionItemTypeOperatorMultiply,
-			ExpressionItemTypeBracketOpen,
-			ExpressionItemTypeBracketClose,
-			ExpressionItemTypeOr,
-			ExpressionItemTypeXor,
-			ExpressionItemTypeAnd,
-			ExpressionItemTypeNot,
-			ExpressionItemTypeMod,
-			ExpressionItemTypeBitShiftLeft,
-			ExpressionItemTypeBitShiftRight,
-			ExpressionItemTypeGreaterOrEquals,
-			ExpressionItemTypeLessOrEquals,
-			ExpressionItemTypeNotEquals,
-			ExpressionItemTypeNotEquals2,
-			ExpressionItemTypeEquals,
-			ExpressionItemTypeLess,
-			ExpressionItemTypeGreater,
+			TokenTypeOperatorPlus,
+			TokenTypeOperatorMinus,
+			TokenTypeOperatorDivision,
+			TokenTypeOperatorMultiply,
+			TokenTypeBracketOpen,
+			TokenTypeBracketClose,
+			TokenTypeOr,
+			TokenTypeXor,
+			TokenTypeAnd,
+			TokenTypeNot,
+			TokenTypeMod,
+			TokenTypeBitShiftLeft,
+			TokenTypeBitShiftRight,
+			TokenTypeGreaterOrEquals,
+			TokenTypeLessOrEquals,
+			TokenTypeNotEquals,
+			TokenTypeNotEquals2,
+			TokenTypeEquals,
+			TokenTypeLess,
+			TokenTypeGreater,
 		})
 		if item != nil {
-			items = append(items, expressionItem{
-				itemType: expressionItemType(*item),
-				value:    nil,
+			items = append(items, token{
+				tokenType: tokenType(*item),
+				value:     nil,
 			})
 
 			continue
@@ -235,37 +235,37 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []expre
 	return items, nil
 }
 
-type expressionItemType string
+type tokenType string
 
 const (
-	ExpressionItemTypeValue            = "value"
-	ExpressionItemTypeBracketOpen      = "("
-	ExpressionItemTypeBracketClose     = ")"
-	ExpressionItemTypeOperatorPlus     = "+"
-	ExpressionItemTypeOperatorMinus    = "-"
-	ExpressionItemTypeOperatorDivision = "/"
-	ExpressionItemTypeOperatorMultiply = "*"
-	ExpressionItemTypeOr               = "or"
-	ExpressionItemTypeXor              = "xor"
-	ExpressionItemTypeAnd              = "and"
-	ExpressionItemTypeNot              = "not"
-	ExpressionItemTypeMod              = "mod"
-	ExpressionItemTypeBitShiftLeft     = "<<"
-	ExpressionItemTypeBitShiftRight    = ">>"
-	ExpressionItemTypeEquals           = "="
-	ExpressionItemTypeNotEquals        = "<>"
-	ExpressionItemTypeNotEquals2       = "><"
-	ExpressionItemTypeLess             = "<"
-	ExpressionItemTypeGreater          = ">"
-	ExpressionItemTypeGreaterOrEquals  = ">="
-	ExpressionItemTypeLessOrEquals     = "<="
-	ExpressionItemTypeThen             = "THEN"
-	ExpressionItemTypeRnd              = "RND"
+	TokenTypeValue            = "value"
+	TokenTypeBracketOpen      = "("
+	TokenTypeBracketClose     = ")"
+	TokenTypeOperatorPlus     = "+"
+	TokenTypeOperatorMinus    = "-"
+	TokenTypeOperatorDivision = "/"
+	TokenTypeOperatorMultiply = "*"
+	TokenTypeOr               = "or"
+	TokenTypeXor              = "xor"
+	TokenTypeAnd              = "and"
+	TokenTypeNot              = "not"
+	TokenTypeMod              = "mod"
+	TokenTypeBitShiftLeft     = "<<"
+	TokenTypeBitShiftRight    = ">>"
+	TokenTypeEquals           = "="
+	TokenTypeNotEquals        = "<>"
+	TokenTypeNotEquals2       = "><"
+	TokenTypeLess             = "<"
+	TokenTypeGreater          = ">"
+	TokenTypeGreaterOrEquals  = ">="
+	TokenTypeLessOrEquals     = "<="
+	TokenTypeThen             = "THEN"
+	TokenTypeRnd              = "RND"
 )
 
-type expressionItem struct {
-	itemType expressionItemType
-	value    *int
+type token struct {
+	tokenType tokenType
+	value     *int
 }
 
 func toBool(v int) bool { return v != 0 }
@@ -277,20 +277,20 @@ func fromBool(v bool) int {
 	return 0
 }
 
-type expressionTreeItem struct {
-	item  *expressionItem
-	left  *expressionTreeItem
-	right *expressionTreeItem
+type syntaxTreeNode struct {
+	item  *token
+	left  *syntaxTreeNode
+	right *syntaxTreeNode
 }
 
-func getClosingBracketIndex(items []expressionItem) (index int, err error) {
+func getClosingBracketIndex(items []token) (index int, err error) {
 	level := 0
 
 	for i, item := range items {
-		switch item.itemType {
-		case ExpressionItemTypeBracketOpen:
+		switch item.tokenType {
+		case TokenTypeBracketOpen:
 			level++
-		case ExpressionItemTypeBracketClose:
+		case TokenTypeBracketClose:
 			level--
 
 			if level == 0 {
@@ -305,49 +305,49 @@ func getClosingBracketIndex(items []expressionItem) (index int, err error) {
 	return index, ErrInvalidParams
 }
 
-var operationsPriority = map[expressionItemType]int{
-	ExpressionItemTypeEquals:          1,
-	ExpressionItemTypeNotEquals:       1,
-	ExpressionItemTypeNotEquals2:      1,
-	ExpressionItemTypeLess:            1,
-	ExpressionItemTypeGreater:         1,
-	ExpressionItemTypeGreaterOrEquals: 1,
-	ExpressionItemTypeLessOrEquals:    1,
+var operationsPriority = map[tokenType]int{
+	TokenTypeEquals:          1,
+	TokenTypeNotEquals:       1,
+	TokenTypeNotEquals2:      1,
+	TokenTypeLess:            1,
+	TokenTypeGreater:         1,
+	TokenTypeGreaterOrEquals: 1,
+	TokenTypeLessOrEquals:    1,
 
-	ExpressionItemTypeOperatorPlus:  2,
-	ExpressionItemTypeOperatorMinus: 2,
-	ExpressionItemTypeOr:            2,
-	ExpressionItemTypeXor:           2,
+	TokenTypeOperatorPlus:  2,
+	TokenTypeOperatorMinus: 2,
+	TokenTypeOr:            2,
+	TokenTypeXor:           2,
 
-	ExpressionItemTypeOperatorMultiply: 3,
-	ExpressionItemTypeOperatorDivision: 3,
-	ExpressionItemTypeBitShiftLeft:     3,
-	ExpressionItemTypeBitShiftRight:    3,
-	ExpressionItemTypeMod:              3,
-	ExpressionItemTypeAnd:              3,
+	TokenTypeOperatorMultiply: 3,
+	TokenTypeOperatorDivision: 3,
+	TokenTypeBitShiftLeft:     3,
+	TokenTypeBitShiftRight:    3,
+	TokenTypeMod:              3,
+	TokenTypeAnd:              3,
 
-	ExpressionItemTypeNot: 4,
+	TokenTypeNot: 4,
 }
 
-func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, error) {
-	ops := []*expressionItem(nil)
-	nodes := []*expressionTreeItem(nil)
+func (p *Program) generateSyntaxTree(items []token) (*syntaxTreeNode, error) {
+	ops := []*token(nil)
+	nodes := []*syntaxTreeNode(nil)
 	// A + 10 * 11 + 1
 	for i := 0; i < len(items); i++ {
 		item := items[i]
-		if item.itemType == ExpressionItemTypeValue {
-			nodes = append(nodes, &expressionTreeItem{
+		if item.tokenType == TokenTypeValue {
+			nodes = append(nodes, &syntaxTreeNode{
 				item:  &items[i],
 				left:  nil,
 				right: nil,
 			})
-		} else if priority, isOperator := operationsPriority[item.itemType]; isOperator {
-			if len(ops) == 0 || priority >= operationsPriority[ops[len(ops)-1].itemType] {
+		} else if priority, isOperator := operationsPriority[item.tokenType]; isOperator {
+			if len(ops) == 0 || priority >= operationsPriority[ops[len(ops)-1].tokenType] {
 				ops = append(ops, &items[i])
 				continue
 			}
 
-			node := &expressionTreeItem{
+			node := &syntaxTreeNode{
 				item:  ops[len(ops)-1],
 				left:  nil,
 				right: nil,
@@ -366,8 +366,8 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 
 			nodes = append(nodes, node)
 
-			for len(ops) != 0 && priority < operationsPriority[ops[len(ops)-1].itemType] {
-				node = &expressionTreeItem{
+			for len(ops) != 0 && priority < operationsPriority[ops[len(ops)-1].tokenType] {
+				node = &syntaxTreeNode{
 					item:  ops[len(ops)-1],
 					left:  nil,
 					right: nil,
@@ -388,13 +388,13 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 			}
 
 			ops = append(ops, &items[i])
-		} else if item.itemType == ExpressionItemTypeBracketOpen {
+		} else if item.tokenType == TokenTypeBracketOpen {
 			index, err := getClosingBracketIndex(items[i:])
 			if err != nil {
 				return nil, err
 			}
 
-			node, err := p.generateTree(items[i+1 : i+index])
+			node, err := p.generateSyntaxTree(items[i+1 : i+index])
 			if err != nil {
 				return nil, err
 			}
@@ -409,7 +409,7 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 	// nodes: "A", "11*10", "1"
 
 	for len(ops) != 0 {
-		node := &expressionTreeItem{
+		node := &syntaxTreeNode{
 			item:  ops[len(ops)-1],
 			left:  nil,
 			right: nil,
@@ -436,121 +436,3 @@ func (p *Program) generateTree(items []expressionItem) (*expressionTreeItem, err
 
 	return nil, ErrInvalidParams
 }
-
-//func (p *Program) getExpressionTreeItem(items []expressionItem) (res *expressionTreeItem, err error) {
-//	if len(items) == 0 {
-//		return nil, nil
-//	}
-//
-//	// value
-//	if len(items) == 1 {
-//		return &expressionTreeItem{
-//			item:  &items[0],
-//			left:  nil,
-//			right: nil,
-//		}, nil
-//	}
-//
-//	// unary operation
-//	if len(items) == 2 {
-//		res = &expressionTreeItem{
-//			item: &items[0],
-//			left: nil,
-//			right: &expressionTreeItem{
-//				item:  &items[1],
-//				left:  nil,
-//				right: nil,
-//			},
-//		}
-//
-//		return res, nil
-//	}
-//
-//	bracketsLevel := 0
-//
-//	for i := 0; i < len(items); i++ {
-//		switch items[i].itemType {
-//		case ExpressionItemTypeEquals2,
-//			ExpressionItemTypeNotEquals,
-//			ExpressionItemTypeLess,
-//			ExpressionItemTypeLessOrEquals,
-//			ExpressionItemTypeGreater,
-//			ExpressionItemTypeGreaterOrEquals:
-//			if i == 0 {
-//				return nil, ErrInvalidParams
-//			}
-//
-//			res.item = &items[i]
-//
-//			res.left, err = p.getExpressionTreeItem(items[:i])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			res.right, err = p.getExpressionTreeItem(items[i+1:])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			return res, nil
-//		case ExpressionItemTypeOperatorPlus,
-//			ExpressionItemTypeOperatorMinus:
-//			if i == 0 {
-//				return nil, ErrInvalidParams
-//			}
-//
-//			res.item = &items[i]
-//
-//			res.left, err = p.getExpressionTreeItem(items[:i])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			res.right, err = p.getExpressionTreeItem(items[i+1:])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			return res, nil
-//		case ExpressionItemTypeOr,
-//			ExpressionItemTypeXor:
-//		case ExpressionItemTypeBracketOpen:
-//			bracketsLevel++
-//
-//			j := 0
-//
-//			j, err = getClosingBracketIndex(items[i:])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			if j <= i {
-//				return res, ErrInvalidParams
-//			}
-//
-//			treeItemInBrackets := (*expressionTreeItem)(nil)
-//
-//			treeItemInBrackets, err = p.getExpressionTreeItem(items[i+1 : j])
-//			if err != nil {
-//				return res, err
-//			}
-//
-//			i = j // перепрыгиваем к закрывающей скобке
-//
-//			if res.left == nil {
-//				// например, если парсим (A+B)+C
-//				res.left = treeItemInBrackets
-//			} else {
-//				// например, если парсим C+(A+B) или C+E/(A+B)-D
-//			}
-//			bracketsLevel++
-//		case ExpressionItemTypeBracketClose:
-//			if bracketsLevel <= 0 {
-//				return res, ErrInvalidParams
-//			}
-//			bracketsLevel--
-//		}
-//	}
-//
-//	return res, nil
-//}

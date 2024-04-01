@@ -241,7 +241,7 @@ func (p *Program) let(s *tinybasic.LineScanner) error {
 		return ErrInvalidParams
 	}
 
-	if expression[0].itemType != ExpressionItemTypeEquals {
+	if expression[0].tokenType != TokenTypeEquals {
 		return ErrInvalidParams
 	}
 
@@ -310,7 +310,7 @@ func (p *Program) ifOperator(s *tinybasic.LineScanner) error {
 		return ErrInvalidParams
 	}
 
-	if expression[len(expression)-1].itemType != ExpressionItemTypeThen {
+	if expression[len(expression)-1].tokenType != TokenTypeThen {
 		return ErrInvalidParams
 	}
 

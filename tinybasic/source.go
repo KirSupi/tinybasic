@@ -85,25 +85,3 @@ func (s *Source) Insert(newLine Line) {
 		s.Lines = append(s.Lines[:index], append([]Line{newLine}, s.Lines[index:]...)...)
 	}
 }
-
-func TestSource() {
-	source := NewSource()
-
-	err := source.Load("example.txt")
-	if err != nil {
-		fmt.Println("error on source.Load:", err.Error())
-	}
-
-	source.Insert(Line{Label: 15, Text: "LET a=1"})
-	fmt.Println(source.Lines)
-
-	err = source.Save("modified_example.txt")
-	if err != nil {
-		fmt.Println("error on source.Save:", err.Error())
-	}
-
-	if err != nil {
-		fmt.Println("error on source.Load:", err.Error())
-	}
-
-}

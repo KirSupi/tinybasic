@@ -34,15 +34,3 @@ func Unary(op rune, a int) int {
 	fmt.Println("Error: unsupported operation")
 	return 0
 }
-
-func TestArithmetics() {
-	fmt.Println("Binary(1, '+', 2):", Binary(1, '+', 2))
-	fmt.Println("Binary(5, '/', 2):", Binary(5, '/', 2))
-	fmt.Println("Unary('-', 1):", Unary('-', 1))
-
-	// Пример с операцией, не поддерживаемой функцией Unary
-	fmt.Println("Unary('+', 1):", Unary('+', 1))
-
-	// Пример с недопустимой операцией в Binary
-	fmt.Println("Binary(1, '%', 2):", Binary(1, '%', 2))
-}
