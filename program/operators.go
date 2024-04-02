@@ -336,3 +336,144 @@ func (p *Program) ifOperator(s *tinybasic.LineScanner) error {
 
 	return nil
 }
+func (p *Program) forOperator(s *tinybasic.LineScanner) error {
+	s.GetSpaces()
+
+	cycle := cycleContext{
+		startLineIndex: p.currentIndex,
+		variableName:   "",
+		start:          0,
+		stop:           0,
+		step:           1,
+	}
+
+	parser := tinybasic.NewLineParserWithScanner(s)
+
+	variableName := parser.GetVariable()
+	if variableName == nil {
+		return ErrInvalidParams
+	}
+
+	cycle.variableName = *variableName
+
+	expression, err := p.parseExpression(s)
+	if err != nil {
+		return err
+	}
+
+	if len(expression) < 2 {
+		return ErrInvalidParams
+	}
+
+	if expression[0].tokenType != TokenTypeEquals {
+		return ErrInvalidParams
+	}
+
+	tokenToIndex := 0
+	tokenStepIndex := 0
+	breakCycle := false
+
+	for i, t := range expression {
+		switch t.tokenType {
+		case TokenTypeTo:
+			tokenToIndex = i
+
+			// Если строка FOR A TO 10
+			if i == 0 {
+				return errors.New("tokenToIndex == 0")
+			}
+
+			// Если строка FOR A=123 TO
+			if i+1 >= len(expression) {
+				return ErrInvalidParams
+			}
+
+			cycle.start, err = p.calculateExpression(expression[1:i])
+			if err != nil {
+				return err
+			}
+
+			p.vars.Set(cycle.variableName, cycle.start)
+
+		case TokenTypeStep:
+			tokenStepIndex = i
+
+			if tokenToIndex == 0 {
+				return errors.New("tokenToIndex == 0")
+			}
+
+			if tokenToIndex+1 >= len(expression) {
+				return ErrInvalidParams
+			}
+
+			cycle.stop, err = p.calculateExpression(expression[tokenToIndex+1 : tokenStepIndex])
+			if err != nil {
+				return err
+			}
+
+			if i+1 >= len(expression) {
+				return ErrInvalidParams
+			}
+
+			cycle.step, err = p.calculateExpression(expression[tokenStepIndex+1:])
+			if err != nil {
+				return err
+			}
+
+			breakCycle = true
+		}
+
+		if breakCycle {
+			break
+		}
+	}
+
+	// Если не нашли STEP, то всё после TO - это cycle.stop
+	if tokenStepIndex == 0 {
+		cycle.stop, err = p.calculateExpression(expression[tokenToIndex+1:])
+		if err != nil {
+			return err
+		}
+	}
+
+	p.cycles = append(p.cycles, cycle)
+
+	return nil
+}
+func (p *Program) next(s *tinybasic.LineScanner) error {
+	s.GetSpaces()
+
+	if len(p.cycles) == 0 {
+		return errors.New("unsupported NEXT without cycle")
+	}
+
+	cycle := p.cycles[len(p.cycles)-1]
+
+	cycleVariableValue := p.vars.Get(cycle.variableName)
+	cycleVariableValue += cycle.step
+	p.vars.Set(cycle.variableName, cycleVariableValue)
+
+	if cycle.stop > cycle.start && cycleVariableValue > cycle.stop {
+		p.vars.Set(cycle.variableName, 0)
+		p.cycles = p.cycles[:len(p.cycles)-1]
+	} else if cycle.stop < cycle.start && cycleVariableValue < cycle.stop {
+		p.vars.Set(cycle.variableName, 0)
+		p.cycles = p.cycles[:len(p.cycles)-1]
+	} else {
+		p.currentIndex = cycle.startLineIndex
+	}
+
+	return nil
+}
+func (p *Program) exit(_ *tinybasic.LineScanner) error {
+	if len(p.cycles) == 0 {
+		return errors.New("unsupported EXIT without cycle")
+	}
+
+	cycle := p.cycles[len(p.cycles)-1]
+
+	p.vars.Set(cycle.variableName, 0)
+	p.cycles = p.cycles[:len(p.cycles)-1]
+
+	return nil
+}

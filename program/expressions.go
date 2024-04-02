@@ -172,14 +172,20 @@ func (p *Program) parseExpression(scanner *tinybasic.LineScanner) (items []token
 			continue
 		}
 
-		thenOperator := scanner.GetString(TokenTypeThen)
-		if thenOperator != nil {
+		operator := scanner.GetStrings([]string{
+			TokenTypeThen,
+			TokenTypeTo,
+			TokenTypeStep,
+		})
+		if operator != nil {
 			items = append(items, token{
-				tokenType: TokenTypeThen,
+				tokenType: tokenType(*operator),
 				value:     nil,
 			})
 
-			break
+			if *operator == TokenTypeThen {
+				break
+			}
 		}
 
 		variableName := parser.GetVariable()
@@ -264,6 +270,8 @@ const (
 	TokenTypeLessOrEquals     = "<="
 	TokenTypeThen             = "THEN"
 	TokenTypeRnd              = "RND"
+	TokenTypeTo               = "TO"
+	TokenTypeStep             = "STEP"
 )
 
 type token struct {
